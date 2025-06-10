@@ -1,0 +1,286 @@
+close all
+
+
+% Open the first Example of the sensor
+Sensor1a = readtable('NewTriangle2FCurve.csv');
+Sensor1 = table2array(Sensor1a);
+Experimenta1 = table2array(readtable('NewTriangle2Data.csv'));
+MotorAngles=sort(Experimenta1(:,1));
+DetailedSensor1X = Interpolate(MotorAngles,Sensor1(:,1));
+DetailedSensor1Y = Interpolate(MotorAngles,Sensor1(:,2));
+p = table2array(readtable('NewTriangle2Calibration.csv'));
+f1 = polyval(p,linspace(0,5,1000));
+Info = readtable('NewTriangle2Info.csv');
+v=table2array(Info(1,2:6));
+Multiplier=median(p(1).*v.^2+p(2).*v+p(3))/median(sqrt(DetailedSensor1Y.^2+DetailedSensor1X.^2));
+
+
+%open the second instance of the sesnor
+Sensor2a = readtable('NewTriangle1FCurve.csv');
+Sensor2 = table2array(Sensor2a);
+Experimenta2 = table2array(readtable('NewTriangle1Data.csv'));
+DetailedSensor2X = Interpolate(MotorAngles,Sensor2(:,1));
+DetailedSensor2Y = Interpolate(MotorAngles,Sensor2(:,2));
+p2 = table2array(readtable('NewTriangle1Calibration.csv'));
+f2 = polyval(p,linspace(0,5,1000));
+Info = readtable('NewTriangle1Info.csv');
+v2=table2array(Info(1,2:6));
+Multiplier2=median(p2(1).*v2.^2+p2(2).*v2+p2(3))/median(sqrt(DetailedSensor2Y.^2+DetailedSensor2X.^2));
+
+% Open sensor 3
+Sensor3a = readtable('NewCross3FCurve.csv');
+Sensor3 = table2array(Sensor3a);
+Experimenta3 = table2array(readtable('NewCircle2Data.csv'));
+DetailedSensor3X = Interpolate(MotorAngles,Sensor3(:,1));
+DetailedSensor3Y = Interpolate(MotorAngles,Sensor3(:,2));
+p3 = table2array(readtable('NewCircle2Calibration.csv'));
+f3 = polyval(p3,linspace(0,5,1000));
+Info = readtable('NewCircle1Info.csv');
+v3=table2array(Info(1,2:6));
+
+
+Strength1=sqrt(sum(Sensor1.^2,2));
+Strength2=sqrt(sum(Sensor2.^2,2));
+Strength3=sqrt(sum(Sensor3.^2,2));
+
+Direction1=atan2d(Sensor1(:,2),Sensor1(:,1));
+Direction1(Direction1-MotorAngles<-180)=Direction1(Direction1-MotorAngles<-180)+360;
+% Direction1(22:end)=Direction1(22:end)+360;
+%Direction1(32=Direction1(32:end)+90
+%Direction1(84:end)=Direction1(84:end)+360;
+% Direction1(76:end)=Direction1(76:end)+360;
+%Direction1=circshift(Direction1,-1);
+%Direction1(end)=Direction1(end)+360;
+
+Direction2=atan2d(Sensor2(:,2),Sensor2(:,1));
+Direction2(Direction2-MotorAngles<-180)=Direction2(Direction2-MotorAngles<-180)+360;
+%Direction2(29:end)=Direction2(29:end)+360;
+% Direction2(end-12:end)=Direction2(end-12:end)-360
+% Direction2=Direction2+90;Direction1(76:end)=Direction1(76:end)+360
+% Direction2(75:end)=Direction2(75:end)+360
+
+%Direction2(62:end)=Direction2(62:end)+360;
+%Direction2(75:82)=Direction2(75:82)-360;
+%Direction2=circshift(Direction2,-1);
+%Direction2(1:18)=Direction2(1:18)-360;
+
+%Direction2(end)=Direction2(end)+360;
+
+Direction3=atan2d(Sensor3(:,2),Sensor3(:,1));
+Direction3(Direction3-MotorAngles<-180)=Direction3(Direction3-MotorAngles<-180)+360;
+%Direction3(70:end)=Direction3(70:end)+360;
+% Direction3=circshift(Direction3,52);
+% Direction3(19:end)=Direction3(19:end)+360;
+% Direction3=Direction3-90;
+%Direction3=circshift(Direction3,1);
+%Direction3(71:81)=Direction3(71:81)+360;
+%Direction3(71:end)=Direction3(71:end)-360;
+%Direction2(12:22)=Direction2(12:22)+360
+
+
+figure()
+plot(MotorAngles, circshift(Strength2./max(Strength2),17),'--','color',[0.5,0.5,0.5],'LineWidth',2)
+hold on
+plot(MotorAngles,Strength2./max(Strength2),'k','LineWidth',2)
+hold on 
+%plot(MotorAngles,Strength3./max(Strength3), 'b','LineWidth',2)
+xlabel({"Flow Direction" '$\varphi$ [$^\circ]$'},'Interpreter','latex')
+xlim([0,360])
+ylim([0,1])
+ylabel({"Relative Strength" "$\overrightarrow{F}$"},'Interpreter','latex')
+
+figure()
+plot(MotorAngles, Direction1,'g','LineWidth',2)
+hold on
+plot(MotorAngles,180-Direction2,'k','LineWidth',2)
+hold on
+plot(MotorAngles,Direction3,'b','LineWidth',2)
+xlim([0,360])
+xlabel({"Flow Direction" '$\varphi$ [$^\circ]$'},'Interpreter','latex')
+ylabel({"Sensed Direction" '$\theta$ $^\circ$'},'Interpreter','latex')
+
+
+
+
+
+SpacingMA = MotorAngles(2)-MotorAngles(1);
+BestRMSE=ones(size(MotorAngles,1),6)*100;
+holdCuveBasedRMSE=100;
+
+
+
+for Offset = 1:size(MotorAngles)
+    for i =1:5
+        RollX2=circshift(Experimenta2(:,2*i),Offset,1);
+        RollY2=circshift(Experimenta2(:,2*i+1),Offset,1);
+    
+        %Find the Theta Prediction Value for 1
+        DataAngles1(:,i)=atan2d(Experimenta1(:,2*i+1),Experimenta1(:,2*i));
+        DataAngles2(:,i)=atan2d(RollY2,RollX2);
+        Hold = abs(DataAngles1(:,i)-Direction1.');
+        Hold(Hold>180)=abs(Hold(Hold>180)-360);
+
+        [~,q] = min(abs(Hold), [], 2);
+        GuessAngle1=MotorAngles(q);
+        GuessAngle1(isnan(DataAngles1(:,i))==1)=NaN;
+        
+        %Find the Theta Prediction Value for 2
+        Hold = abs(DataAngles2(:,i)-Direction2.');
+        Hold(Hold>180)=abs(Hold(Hold>180)-360);
+        [~,q] = min(abs(Hold), [], 2);
+        GuessAngle2=MotorAngles(q)+MotorAngles(Offset);
+        GuessAngle2=rem(GuessAngle2,360);
+        
+
+        DX1=cosd(GuessAngle1);
+        DX2=cosd(GuessAngle2);
+        DY1=sind(GuessAngle1);
+        DY2=sind(GuessAngle2);
+        
+        AverageGuess=atan2d((DY1+DY2),(DX1+DX2));
+        Error = abs(AverageGuess-MotorAngles);
+        Error(Error>180) = Error(Error>180)-360;
+        ThetaVarPhiMethodError(:,i)=Error;
+
+        PairOffsetGuess(:,i) = FindClosestSimultaneous3 (DetailedSensor1X*Multiplier, DetailedSensor1Y*Multiplier, DetailedSensor2X*Multiplier2,DetailedSensor2Y*Multiplier2, Experimenta1(:,2*i), Experimenta1(:,2*i+1), RollX2, RollY2, int32(MotorAngles(Offset)));
+
+    end
+    NetValuesRMSE(Offset,:) = sqrt(mean(ThetaVarPhiMethodError.^2,'all','omitnan'));
+    vGuess = OutputVelcities(AverageGuess,DetailedSensor1X,DetailedSensor1Y,Experimenta1(:,2:2:end),Experimenta1(:,3:2:end),f1);
+    vError=(v-vGuess).^2;
+    vNetRMSE(Offset,:)=sqrt(mean(rmoutliers(vError),'all','omitnan'));
+    
+    
+    
+   
+    Error1 = abs(PairOffsetGuess-MotorAngles);
+    Error1(Error1>180) = Error1(Error1>180)-360;
+    DeadZone(Offset,:) = sqrt(mean(Error1.^2,2,'omitnan'));
+    CuveBasedRMSE(Offset,:) = sqrt(mean(Error1.^2,'all','omitnan'));
+
+    vGuess = OutputVelcities(PairOffsetGuess,DetailedSensor1X,DetailedSensor1Y,Experimenta1(:,2:2:end),Experimenta1(:,3:2:end),f1);
+    vError(:,:)=(v-vGuess).^2;
+    vCurveRMSE(Offset,:)=sqrt(mean(rmoutliers(vError),'all','omitnan'));
+
+end
+[~,index]=min(CuveBasedRMSE)
+DeadZoneCare=DeadZone(index,:);
+
+kkOld=-2.5;
+figure()
+v3=rem(MotorAngles,60);
+scatter(v3,DeadZoneCare,'filled')
+for kk =0:2.5:360
+    hold=kk/2.5+1;
+   
+    vals=rem((MotorAngles-kk),90);
+    X(hold)=kk;
+    BarY(hold)=mean(DeadZoneCare(abs(vals)<2.5),"all",'omitnan');
+    StdBarY(hold)=std(DeadZoneCare(abs(vals)<2.5),"omitnan");
+end
+figure()
+x2=X(1,1:size(BarY,2));
+h = bar(x2,BarY);
+h.EdgeColor = 'none';
+hold on
+%er = errorbar(x2,BarY,StdBarY,StdBarY);
+er.Color = [0 0 0];                            
+er.LineStyle = 'none'; 
+yline(6.5,'-','Baseline')
+ylabel({"RMSE $\hat{\varphi}$"  "[$^\circ$] "},'Interpreter','latex')
+xlabel({"Flow Direction" '$\varphi$ [$^\circ]$'},'Interpreter','latex')
+
+
+figure()
+plot(MotorAngles,circshift(CuveBasedRMSE,4),"k")
+ylabel({"RMSE $\hat{\varphi}$"  "[$^\circ$] "},'Interpreter','latex')
+xlabel({"Offset Angle" "$\omega$ [$^\circ$] "},'Interpreter','latex')
+ylim([0,40])
+xlim([0,360])
+minNewMethod=min(CuveBasedRMSE)
+minVNewMethod=vCurveRMSE(index)
+% yline(6.44,'-','Baseline')
+
+figure()
+plot(MotorAngles,NetValuesRMSE,"b")
+ylabel({"RMSE $\hat{\varphi}$"  "[$^\circ$] "},'Interpreter','latex')
+xlabel({"Offset Angle" "$\omega$ [$^\circ$] "},'Interpreter','latex')
+ylim([0,40])
+xlim([0,360])
+[minOldMethod,indx2]=min(NetValuesRMSE)
+minvOldMethod=vNetRMSE(indx2)
+
+figure()
+boxchart([NetValuesRMSE, CuveBasedRMSE],'Orientation','horizontal')
+xlabel({"RMSE $\hat{\varphi}$"  "[$^\circ$] "},'Interpreter','latex')
+
+NetVals(4,:)=NetValuesRMSE;
+CuveVals(4,:)=CuveBasedRMSE;
+
+figure()
+boxchart(NetVals.','Orientation','horizontal')
+xlim([0,45])
+xline(5.7,'-','Baseline')
+xlabel({"RMSE $\hat{\varphi}$"  "[$^\circ$] "},'Interpreter','latex')
+box on
+% 
+% figure()
+% scatter(CuveBasedRMSE,vCurveRMSE,10,'filled')
+function AngleArray = FindClosestSimultaneous3 (AllXCurve1, AllYCurve1, AllXCurve2, AllYCurve2, AllXData1, AllYData1, AllXData2, AllYData2, Offset)
+    
+    % Look Up Table
+    RolledAllXCurve = circshift(AllXCurve2,Offset,1);
+    RolledAllYCurve = circshift(AllYCurve2,Offset,1);
+    AngleArray = zeros(size(AllXData1,1),size(AllXData2,2));
+
+    LookUp = [AllXCurve1 AllYCurve1 RolledAllXCurve RolledAllYCurve];
+    LookUp = LookUp./max(sqrt(LookUp(:,1:2:end).^2+LookUp(:,2:2:end).^2),[],2);
+    for jj =1:size(AllXData2,2)
+        DataTable = [AllXData1(:,jj), AllYData1(:,jj), AllXData2(:,jj), AllYData2(:,jj)];
+        DataTable = DataTable./max(sqrt(DataTable(:,1:2:end).^2+DataTable(:,2:2:end).^2),[],2);
+        dist = zeros(360,size(AllXData1,1));
+        for ii = 1:4
+            dist = dist+(LookUp(:,ii)-DataTable(:,ii).').^2;
+        end
+        % dist = movmean(dist,5,1);
+        for angle = 1:size(AllXData1,1)
+            [~, AngleArray(angle,jj)]=min(dist(:,angle));
+        end
+    end
+    AngleArray(isnan(AllXData1)==1)=NaN;
+    AngleArray(isnan(AllXData2)==1)=NaN;
+
+end
+
+function YOut = Interpolate(xs,ys)
+    dist=xs-linspace(0,359,360);
+    dist(dist>180)=dist(dist>180)-360;
+    dist(dist<-180)=dist(dist<-180)+360;
+    
+    YOut=ones(360,1);
+    for i=0:359
+        [~, I]=sort(abs(dist(:,i+1)));
+        bottom=xs(I(2))-xs(I(1));
+        bottom(abs(bottom)<1) = sign(bottom)*1;
+        YOut(i+1) = ys(I(1)) + (i-xs(I(1))) * (ys(I(2))-ys(I(1)))/bottom;
+    end       
+
+end
+
+function vGuess = OutputVelcities(PhiGuess,CombinedCurveX,CombinedCurveY,DataX,DataY,f1)
+    q=round(PhiGuess)+1;
+    q(q<0)=q(q<0)+360;
+    q(q>360)=q(q>360)-360;
+    q(isnan(PhiGuess)==1)=1;
+
+    FX=CombinedCurveX(q);
+    FY=CombinedCurveY(q);
+    Strength2=sqrt(DataY.^2+DataX.^2);
+    yVal=Strength2./sqrt(FX.^2+FY.^2);
+    for i =1:size(yVal,2)
+        [~,vLookUp]=min(abs(yVal(:,i)-f1),[],2);
+        vGuess(:,i)=5*vLookUp/1000;
+        
+    end
+    vGuess(isnan(PhiGuess)==1)=NaN;
+end
