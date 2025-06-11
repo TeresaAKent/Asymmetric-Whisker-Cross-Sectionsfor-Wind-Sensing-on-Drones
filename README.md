@@ -18,7 +18,12 @@ Post processing is all done in one Matlab Code. For the paired sensor preformanc
 4. **Calculate Single Sensor Accuracy:** the accuracy of the Theta Method, Asymmetric Method and symmetry for Tables 1, 2 and S1.
 5. **Generate Figures:** Figures 2 and 3 for each sensor are generated here. Diagrmatic figure 4b was also generated here althought it has been commented out.
 
-The idea to do the temporal analysis was completed after all of the analysis 
+The results of this post processing is in folder....yyyy.
+
+The idea to do the temporal analysis was completed after all of the analysis was preformed on the summary data. To preserve a record of the analysis a new file was created which shares many of the same elements. The temporal analysis is preformed in the [AnalyzingEachSensorRollEachTrial.m file](https://github.com/TeresaAKent/Asymmetric-Whisker-Cross-Sectionsfor-Wind-Sensing-on-Drones/blob/main/Data%20Analysis/AnalyzingEachSensorRollEachTrial.m)
+Many of the same steps are prefromed however it also outputs matlab data tables where all of the temporal data is preseverved for the temporal analysis done below.
+
+The results of this post processing can be found in this zz folder.
 
 ### Analyzing Paired Sensors Preformance
 The code multi curve consideration accomplishes the following tasks.
