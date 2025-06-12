@@ -1,0 +1,169 @@
+close all
+clear all
+%% Load Experimental Data
+Offset=61;
+load NewTriangle2.mat
+
+FullSignal1X=X5;
+FullSignal1Y=Y5;
+FullMotor1=ZeroTo360(Motor5-180);
+
+load NewTriangle3.mat
+
+FullSignal2X=X5;
+FullSignal2Y=Y5;
+FullMotor2=ZeroTo360(Motor5-180);
+
+MotorAngles = sort(unique(Motor5));
+
+%% Load the Sensor Model
+
+% Open the first Example of the sensor
+Sensor1a = readtable('NewTriangle2FCurve.csv');
+Sensor1 = table2array(Sensor1a);
+DetailedSensor1X = Interpolate(MotorAngles,Sensor1(:,1));
+DetailedSensor1Y = Interpolate(MotorAngles,Sensor1(:,2));
+p = table2array(readtable('NewTriangle2Calibration.csv'));
+f1 = polyval(p,linspace(0,5,1000));
+Info = readtable('NewTriangle2Info.csv');
+v=table2array(Info(1,2:6));
+Multiplier=median(p(1).*v.^2+p(2).*v+p(3))/median(sqrt(DetailedSensor1Y.^2+DetailedSensor1X.^2));
+
+
+%open the second instance of the sesnor
+Sensor2a = readtable('NewTriangle3FCurve.csv');
+Sensor2 = table2array(Sensor2a);
+DetailedSensor2X = Interpolate(MotorAngles,Sensor2(:,1));
+DetailedSensor2Y = Interpolate(MotorAngles,Sensor2(:,2));
+p2 = table2array(readtable('NewTriangle3Calibration.csv'));
+f2 = polyval(p,linspace(0,5,1000));
+Info = readtable('NewTriangle3Info.csv');
+v2=table2array(Info(1,2:6));
+Multiplier2=median(p2(1).*v2.^2+p2(2).*v2+p2(3))/median(sqrt(DetailedSensor2Y.^2+DetailedSensor2X.^2));
+
+
+
+
+MassiveTable=zeros(size(MotorAngles,1),150);
+MassiveThetaTable=zeros(size(MotorAngles,1),150);
+NumberUsed=0;
+% For each angle i between 0 and 360 degPrees
+selected_rows = [1:23, 26:40,43:100];
+[5,6,7,8];
+for i =15:15
+    NumberUsed=NumberUsed+1;
+    % For filter sizes between 1 and 150 of size j
+    CellData1 = find(One80ToOne80(FullMotor1-MotorAngles(i))<0.5);
+    ReferenceAngle2 = One80ToOne80(FullMotor2 - MotorAngles(i)+Offset);
+    CellData2 = find(ReferenceAngle2<0.5);
+    if size(CellData1)+size(CellData2)>305
+        continue
+    end
+      
+    for j = 1:150
+        % Get data set 1
+        Signal1X = movmean(rmoutliers([FullSignal1X(CellData1);FullSignal1X(CellData1)]),j);
+        Signal1X = Signal1X(75:225);
+        Signal1Y = movmean(rmoutliers([FullSignal1Y(CellData1);FullSignal1Y(CellData1)]),j);
+        Signal1Y = Signal1Y(75:225);
+
+        %Get data set 2 at the offset that is best
+        Signal2X = movmean(rmoutliers([FullSignal2X(CellData2);FullSignal2X(CellData2)]),j);
+        Signal2X = Signal2X(75:225);
+        Signal2Y = movmean(rmoutliers([FullSignal2Y(CellData2);FullSignal2Y(CellData2)]),j);
+        Signal2Y = Signal2Y(75:225);
+
+        PairOffsetGuess = FindClosestSimultaneous3 (DetailedSensor1X*Multiplier, DetailedSensor1Y*Multiplier, Multiplier2*DetailedSensor2X,Multiplier2*DetailedSensor2Y, Signal1X, Signal1Y, Signal2X , Signal2Y , Offset);
+        Guess2=atan2d(Signal2Y,Signal2X)+Offset;
+        Strength=sqrt(Signal2Y.^2+Signal2X.^2);
+        Guess2X=sind(Guess2);
+        Guess2Y=cosd(Guess2);
+        ThetaOffsetGuessError = atan2d(Signal1Y+Strength.*Guess2X,Signal1X+Strength.*Guess2Y)-MotorAngles(i);
+        Error=PairOffsetGuess-MotorAngles(i);
+        Error = One80ToOne80(Error);
+        ThetaOffsetGuessError = One80ToOne80(ThetaOffsetGuessError);
+        
+        MassiveTable(i,j)=sum((Error).^2,'all');
+        MassiveThetaTable(i,j)=sum((ThetaOffsetGuessError).^2,'all');
+    end
+    PredictionAngle(i)=MotorAngles(i);
+    AverageGuess(i)=PairOffsetGuess(end:end);
+end
+NumSampError2 = sqrt(sum(MassiveTable,1)/(150*NumberUsed));
+NumSampThetaError2 = sqrt(sum(MassiveThetaTable,1)/(150*NumberUsed));
+
+figure()
+% plot(linspace(1,150,150)/150,NumSampError,'-ok')
+% hold on
+plot(linspace(1,150,150),NumSampError2,'-^',...
+    'LineWidth',1,...
+    'Color',[.96,0.85,0.05],...
+    'MarkerSize',5,...
+    'MarkerEdgeColor',[.96,0.75,0.05],...
+    'MarkerFaceColor',[.95,0.75,0.05])
+hold on
+plot(linspace(1,150,150),NumSampThetaError2,'-ko',...
+    'LineWidth',1,...
+    'Color',[0.5,0.5,0.5],...
+    'MarkerSize',5,...
+    'MarkerEdgeColor','k',...
+    'MarkerFaceColor',[0.5,0.5,0.5])
+xlabel("Filter Window")
+ylabel({"RMSE $\hat{\varphi}$"  "[$^\circ$] "},'Interpreter','latex')
+set(gca, 'Xscale', 'log');
+set(gca, 'Yscale', 'log');
+
+%% Functions
+
+function AngleArray = FindClosestSimultaneous3 (AllXCurve1, AllYCurve1, AllXCurve2, AllYCurve2, AllXData1, AllYData1, AllXData2, AllYData2, Offset)
+     % Look Up Table
+    RolledAllXCurve = circshift(AllXCurve2,Offset,1);
+    RolledAllYCurve = circshift(AllYCurve2,Offset,1);
+    AngleArray = zeros(size(AllXData1,1),size(AllXData2,2));
+
+    LookUp = [AllXCurve1 AllYCurve1 RolledAllXCurve RolledAllYCurve];
+    LookUp = LookUp./max(sqrt(LookUp(:,1:2:end).^2+LookUp(:,2:2:end).^2),[],2);
+    for jj =1:size(AllXData2,2)
+        DataTable = [AllXData1(:,jj), AllYData1(:,jj), AllXData2(:,jj), AllYData2(:,jj)];
+        DataTable = DataTable./max(sqrt(DataTable(:,1:2:end).^2+DataTable(:,2:2:end).^2),[],2);
+        dist = zeros(360,size(AllXData1,1));
+        for ii = 1:4
+            size(dist);
+            size(LookUp);
+            size(DataTable);
+            dist = dist+(LookUp(:,ii)-DataTable(:,ii).').^2;
+        end
+        % dist = movmean(dist,5,1);
+        for angle = 1:size(AllXData1,1)
+            [~, AngleArray(angle,jj)]=min(dist(:,angle));
+        end
+    end
+    AngleArray(isnan(AllXData1)==1)=NaN;
+    AngleArray(isnan(AllXData2)==1)=NaN;
+
+end
+function YOut = Interpolate(xs,ys)
+    dist=xs-linspace(0,359,360);
+    dist(dist>180)=dist(dist>180)-360;
+    dist(dist<-180)=dist(dist<-180)+360;
+    
+    YOut=ones(360,1);
+    for i=0:359
+        [~, I]=sort(abs(dist(:,i+1)));
+        bottom=xs(I(2))-xs(I(1));
+        bottom(abs(bottom)<1) = sign(bottom)*1;
+        YOut(i+1) = ys(I(1)) + (i-xs(I(1))) * (ys(I(2))-ys(I(1)))/bottom;
+    end       
+
+end
+function Angles=ZeroTo360(Angles)
+    Angles=rem(Angles,360);
+    Angles(Angles<0) = Angles(Angles<0)+360;
+    Angles(Angles>360) = Angles(Angles>360)-360;
+end
+function Angles=One80ToOne80(Angles)
+    Angles = rem(Angles,360);
+    Angles(Angles>180) = Angles(Angles>180)-360;
+    Angles(Angles<-180) = Angles(Angles<-180)+360;
+    Angles=abs(Angles);
+end
