@@ -1,45 +1,81 @@
 close all
 clear all
 %% Load Experimental Data
-Offset=61;
-load NewTriangle2.mat
+Offset= 209;
+load NewCross1.mat
 
-FullSignal1X=X5;
-FullSignal1Y=Y5;
-FullMotor1=ZeroTo360(Motor5-180);
+FullSignal1X=X4;
+FullSignal1Y=Y4;
+FullMotor1=ZeroTo360(Motor4);
 
-load NewTriangle3.mat
+load NewCross3.mat
 
-FullSignal2X=X5;
-FullSignal2Y=Y5;
-FullMotor2=ZeroTo360(Motor5-180);
+FullSignal2X=X3;
+FullSignal2Y=Y3;
+FullMotor2=ZeroTo360(Motor3);
 
-MotorAngles = sort(unique(Motor5));
+Offset2=180;
+load NewCircle3.mat
+
+FullSignal1CX=X3;
+FullSignal1CY=Y5;
+FullMotor1C=ZeroTo360(Motor5);
+
+load NewCircle1.mat
+
+FullSignal2CX=X5;
+FullSignal2CY=Y5;
+FullMotor2C=ZeroTo360(Motor5);
+
+MotorAngles = sort(unique(Motor3));
 
 %% Load the Sensor Model
 
 % Open the first Example of the sensor
-Sensor1a = readtable('NewTriangle2FCurve.csv');
+Sensor1a = readtable('NewCross1FCurve.csv');
 Sensor1 = table2array(Sensor1a);
 DetailedSensor1X = Interpolate(MotorAngles,Sensor1(:,1));
 DetailedSensor1Y = Interpolate(MotorAngles,Sensor1(:,2));
-p = table2array(readtable('NewTriangle2Calibration.csv'));
+p = table2array(readtable('NewCross1Calibration.csv'));
 f1 = polyval(p,linspace(0,5,1000));
-Info = readtable('NewTriangle2Info.csv');
+Info = readtable('NewCross1Info.csv');
 v=table2array(Info(1,2:6));
-Multiplier=median(p(1).*v.^2+p(2).*v+p(3))/median(sqrt(DetailedSensor1Y.^2+DetailedSensor1X.^2));
+Multiplier=median(p(1)+p(2)+p(3))/median(sqrt(DetailedSensor1Y.^2+DetailedSensor1X.^2));
 
 
 %open the second instance of the sesnor
-Sensor2a = readtable('NewTriangle3FCurve.csv');
+Sensor2a = readtable('NewCross3FCurve.csv');
 Sensor2 = table2array(Sensor2a);
 DetailedSensor2X = Interpolate(MotorAngles,Sensor2(:,1));
 DetailedSensor2Y = Interpolate(MotorAngles,Sensor2(:,2));
-p2 = table2array(readtable('NewTriangle3Calibration.csv'));
+p2 = table2array(readtable('NewCross3Calibration.csv'));
 f2 = polyval(p,linspace(0,5,1000));
-Info = readtable('NewTriangle3Info.csv');
+Info = readtable('NewCross3Info.csv');
 v2=table2array(Info(1,2:6));
-Multiplier2=median(p2(1).*v2.^2+p2(2).*v2+p2(3))/median(sqrt(DetailedSensor2Y.^2+DetailedSensor2X.^2));
+Multiplier2=median(p2(1)+p2(2)+p2(3))/median(sqrt(DetailedSensor2Y.^2+DetailedSensor2X.^2));
+
+% Open the first Example of the Circle sensor
+Sensor1aC = readtable('NewCircle3FCurve.csv');
+Sensor1C = table2array(Sensor1aC);
+DetailedSensor1CX = Interpolate(MotorAngles,Sensor1C(:,1));
+DetailedSensor1CY = Interpolate(MotorAngles,Sensor1(:,2));
+p = table2array(readtable('NewCircle3Calibration.csv'));
+f1 = polyval(p,linspace(0,5,1000));
+Info = readtable('NewCircle3Info.csv');
+v=table2array(Info(1,2:6));
+MultiplierC=median(p(1).*v.^2+p(2).*v+p(3))/median(sqrt(DetailedSensor1Y.^2+DetailedSensor1X.^2));
+
+
+%open the second instance of the Circle sesnor
+Sensor2aC = readtable('NewCircle1FCurve.csv');
+Sensor2C = table2array(Sensor2aC);
+DetailedSensor2CX = Interpolate(MotorAngles,Sensor2C(:,1));
+DetailedSensor2CY = Interpolate(MotorAngles,Sensor2C(:,2));
+p2 = table2array(readtable('NewCircle1Calibration.csv'));
+f2 = polyval(p,linspace(0,5,1000));
+Info = readtable('NewCircle1Info.csv');
+v2=table2array(Info(1,2:6));
+Multiplier2C=median(p2(1).*v2.^2+p2(2).*v2+p2(3))/median(sqrt(DetailedSensor2Y.^2+DetailedSensor2X.^2));
 
 
 
@@ -48,32 +84,97 @@ MassiveTable=zeros(size(MotorAngles,1),150);
 MassiveThetaTable=zeros(size(MotorAngles,1),150);
 NumberUsed=0;
 % For each angle i between 0 and 360 degPrees
-selected_rows = [1:23, 26:40,43:100];
-[5,6,7,8];
-for i =1:10
-    NumberUsed=NumberUsed+1;
+TopOne=20000;
+
+for n = 1:size(MotorAngles)
+    OffsetTemp=round(MotorAngles(n));
+    Error=0;
+    for i =1:100
+        % For filter sizes between 1 and 150 of size j
+        CellData1 = find(One80ToOne80(FullMotor1-MotorAngles(i))<0.5);
+        ReferenceAngle2 = One80ToOne80(FullMotor2 - MotorAngles(i)+OffsetTemp);
+        CellData2 = find(ReferenceAngle2<0.5);
+        
+    
+        if size(CellData1)+size(CellData2)>305
+            continue
+        end
+        % NumberUsed=NumberUsed+1;
+          
+        for j = 150:150
+            % Get data set 1
+            Signal1X = movmean(movmean([FullSignal1X(CellData1);FullSignal1X(CellData1)],j),j);
+            Signal1X = Signal1X(75:225);
+            Signal1Y = movmean(movmean([FullSignal1Y(CellData1);FullSignal1Y(CellData1)],j),j);
+            Signal1Y = Signal1Y(75:225);
+    
+    
+            %Get data set 2 at the offset that is best
+            Signal2X = movmean(movmean([FullSignal2X(CellData2);FullSignal2X(CellData2)],j),j);
+            Signal2X = Signal2X(75:225);
+            Signal2Y = movmean(movmean([FullSignal2Y(CellData2);FullSignal2Y(CellData2)],j),j);
+            Signal2Y = Signal2Y(75:225);
+    
+    
+            PairOffsetGuess = FindClosestSimultaneous3 (DetailedSensor1X*Multiplier, DetailedSensor1Y*Multiplier, Multiplier2*DetailedSensor2X,Multiplier2*DetailedSensor2Y, Signal1X, Signal1Y, Signal2X , Signal2Y , OffsetTemp);
+            
+      
+           
+        end
+        Error=Error+One80ToOne80(PairOffsetGuess(end)-MotorAngles(i));
+        
+    end
+    Error2=sqrt(sum(Error.^2)/101);
+    if Error2<TopOne
+            TopOne=Error2;
+            Offset=OffsetTemp;
+    end
+        
+
+
+end
+
+for i =1:100
     % For filter sizes between 1 and 150 of size j
     CellData1 = find(One80ToOne80(FullMotor1-MotorAngles(i))<0.5);
     ReferenceAngle2 = One80ToOne80(FullMotor2 - MotorAngles(i)+Offset);
     CellData2 = find(ReferenceAngle2<0.5);
+    % Circle
+    CellData1C = find(One80ToOne80(FullMotor1C-MotorAngles(i))<0.5);
+    ReferenceAngle2C = One80ToOne80(FullMotor2C - MotorAngles(i)+Offset2);
+    CellData2C = find(ReferenceAngle2C<0.5);
+
     if size(CellData1)+size(CellData2)>305
         continue
     end
+    NumberUsed=NumberUsed+1;
       
     for j = 1:150
         % Get data set 1
-        Signal1X = movmean(rmoutliers([FullSignal1X(CellData1);FullSignal1X(CellData1)]),j);
+        Signal1X = movmean(movmean([FullSignal1X(CellData1);FullSignal1X(CellData1)],j),j);
         Signal1X = Signal1X(75:225);
-        Signal1Y = movmean(rmoutliers([FullSignal1Y(CellData1);FullSignal1Y(CellData1)]),j);
+        Signal1Y = movmean(movmean([FullSignal1Y(CellData1);FullSignal1Y(CellData1)],j),j);
         Signal1Y = Signal1Y(75:225);
 
+        % Circle Get data set 1
+        Signal1CX = movmean(movmean([FullSignal1CX(CellData1C);FullSignal1CX(CellData1C)],j),j);
+        Signal1CX = Signal1CX(75:225);
+        Signal1CY = movmean(movmean([FullSignal1CY(CellData1C);FullSignal1CY(CellData1C)],j),j);
+        Signal1CY = Signal1CY(75:225);
+
         %Get data set 2 at the offset that is best
-        Signal2X = movmean(rmoutliers([FullSignal2X(CellData2);FullSignal2X(CellData2)]),j);
+        Signal2X = movmean(movmean([FullSignal2X(CellData2);FullSignal2X(CellData2)],j),j);
         Signal2X = Signal2X(75:225);
-        Signal2Y = movmean(rmoutliers([FullSignal2Y(CellData2);FullSignal2Y(CellData2)]),j);
+        Signal2Y = movmean(movmean([FullSignal2Y(CellData2);FullSignal2Y(CellData2)],j),j);
         Signal2Y = Signal2Y(75:225);
 
-        PairOffsetGuess = FindClosestSimultaneous3 (DetailedSensor1X*Multiplier, DetailedSensor1Y*Multiplier, Multiplier1*DetailedSensor2X,Multiplier1*DetailedSensor2Y, Signal1X, Signal1Y, Signal2X , Signal2Y , Offset);
+        %Get data set 2 at the offset that is best Circle
+        Signal2CX = movmean(movmean([FullSignal2CX(CellData2C);FullSignal2CX(CellData2C)],j),j);
+        Signal2CX = Signal2CX(75:225);
+        Signal2CY = movmean(movmean([FullSignal2CY(CellData2C);FullSignal2CY(CellData2C)],j),j);
+        Signal2CY = Signal2CY(75:225);
+
+        PairOffsetGuess = FindClosestSimultaneous3 (DetailedSensor1X*Multiplier, DetailedSensor1Y*Multiplier, Multiplier2*DetailedSensor2X,Multiplier2*DetailedSensor2Y, Signal1X, Signal1Y, Signal2X , Signal2Y , Offset);
         Guess2=atan2d(Signal2Y,Signal2X)+Offset;
         Strength=sqrt(Signal2Y.^2+Signal2X.^2);
         Guess2X=sind(Guess2);
@@ -82,35 +183,56 @@ for i =1:10
         Error=PairOffsetGuess-MotorAngles(i);
         Error = One80ToOne80(Error);
         ThetaOffsetGuessError = One80ToOne80(ThetaOffsetGuessError);
+
+        % Circle
+        PairOffsetGuessC = FindClosestSimultaneous3 (DetailedSensor1CX*MultiplierC, DetailedSensor1CY*MultiplierC, Multiplier2C*DetailedSensor2CX,Multiplier2C*DetailedSensor2CY, Signal1CX, Signal1CY, Signal2CX , Signal2CY , Offset2);
+        Guess2C=atan2d(Signal2CY,Signal2CX)+Offset2;
+        StrengthC=sqrt(Signal2CY.^2+Signal2CX.^2);
+        Guess2XC=sind(Guess2C);
+        Guess2YC=cosd(Guess2C);
+        ThetaOffsetGuessErrorC = atan2d(Signal1CY+StrengthC.*Guess2XC,Signal1CX+StrengthC.*Guess2YC)-MotorAngles(i);
+        ErrorC=PairOffsetGuessC-MotorAngles(i);
+        ErrorC = One80ToOne80(ErrorC);
+        ThetaOffsetGuessErrorC = One80ToOne80(ThetaOffsetGuessErrorC);
         
         MassiveTable(i,j)=sum((Error).^2,'all');
         MassiveThetaTable(i,j)=sum((ThetaOffsetGuessError).^2,'all');
+
+        % Circle
+        MassiveTableC(i,j)=sum((ErrorC).^2,'all');
+        MassiveThetaTableC(i,j)=sum((ThetaOffsetGuessErrorC).^2,'all');
     end
     PredictionAngle(i)=MotorAngles(i);
     AverageGuess(i)=PairOffsetGuess(end:end);
+
+    PredictionAngleC(i)=MotorAngles(i);
+    AverageGuessC(i)=PairOffsetGuessC(end:end);
 end
 NumSampError2 = sqrt(sum(MassiveTable,1)/(150*NumberUsed));
 NumSampThetaError2 = sqrt(sum(MassiveThetaTable,1)/(150*NumberUsed));
 
+NumSampError2C = sqrt(sum(MassiveTableC,1)/(150*NumberUsed));
+NumSampThetaError2C = sqrt(sum(MassiveThetaTableC,1)/(150*NumberUsed));
+
 figure()
 % plot(linspace(1,150,150)/150,NumSampError,'-ok')
 % hold on
-plot(linspace(1,150,150),NumSampError2,'-^',...
-    'LineWidth',1,...
-    'Color',[.96,0.85,0.05],...
-    'MarkerSize',5,...
-    'MarkerEdgeColor',[.96,0.75,0.05],...
-    'MarkerFaceColor',[.95,0.75,0.05])
+plot(linspace(1,150,150),NumSampError2,'-x',...
+    'LineWidth',0.75,...
+    'Color',[.96,0.5,0.05],...
+    'MarkerSize',4,...
+    'MarkerEdgeColor',[.96,0.5,0.05],...
+    'MarkerFaceColor',[.95,0.5,0.05])
 hold on
-plot(linspace(1,150,150),NumSampThetaError2,'-ko',...
-    'LineWidth',1,...
+NumSampError2(end)
+plot(linspace(1,150,150),NumSampThetaError2C,'-ko',...
+    'LineWidth',0.75,...
     'Color',[0.5,0.5,0.5],...
-    'MarkerSize',5,...
+    'MarkerSize',4,...
     'MarkerEdgeColor','k',...
     'MarkerFaceColor',[0.5,0.5,0.5])
 xlabel("Filter Window")
 ylabel({"RMSE $\hat{\varphi}$"  "[$^\circ$] "},'Interpreter','latex')
-set(gca, 'Xscale', 'log');
 set(gca, 'Yscale', 'log');
 
 %% Functions
