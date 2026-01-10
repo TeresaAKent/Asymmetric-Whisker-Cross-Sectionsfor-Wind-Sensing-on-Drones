@@ -1,6 +1,6 @@
 # Asymmetric-Whisker-Cross-Sections-for-Wind-Sensing-on-Drones
 This code works is a companion to the research paper, Asymmetric Whisker-Inspired Sensing Arrays
-for Enhanced Airflow Sensing on Drones.
+for Enhanced Airflow Sensing on Drones which is under review
 
 ## Data Collection
 ### Arduino Code
